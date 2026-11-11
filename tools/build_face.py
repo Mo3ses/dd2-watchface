@@ -111,6 +111,21 @@ VARIANTS = {
                {"atlas": "banner", "x": 140, "y": 266, "vt": 0, "dt": 10, "align": 1,
                 "box": (60, 246, 160, 40)},
            ]},
+    "v8": {"tile": (47, 74), "colon": (18, 74), "size": 88, "baseline": 0.88,
+           "layout": "v8", "art": True,
+           "banner": {"tile": (18, 32), "size": 30, "baseline": 0.86},
+           "metrics": [
+               {"atlas": "value", "x": 75, "y": 334, "vt": 2, "dt": 11, "align": 1,
+                "box": (24, 314, 102, 48)},
+               {"atlas": "value", "x": 205, "y": 334, "vt": 1, "dt": 12, "align": 1,
+                "box": (152, 314, 102, 48)},
+               {"atlas": "value", "x": 75, "y": 406, "vt": 4, "dt": 21, "align": 1,
+                "box": (24, 386, 102, 48)},
+               {"atlas": "value", "x": 222, "y": 386, "vt": 9, "dt": 17, "align": 2,
+                "box": (152, 382, 102, 48)},
+               {"atlas": "banner", "x": 140, "y": 266, "vt": 0, "dt": 10, "align": 1,
+                "box": (60, 246, 160, 40)},
+           ]},
 }
 
 
@@ -236,6 +251,11 @@ def main() -> int:
             layout_bytes = L.fix_time_alignment(layout_bytes, hour_x=131, colon_x=131,
                                                 minute_x=149, y=68, minute_align=0)
             layout_bytes = L.split_hour(layout_bytes, tens_x=37, units_x=84, y=68)
+        elif cfg.get("layout") == "v8":
+            layout_bytes = L.fix_time_alignment(layout_bytes, hour_x=131, colon_x=131,
+                                                minute_x=149, y=68, minute_align=0)
+            layout_bytes = L.split_hour(layout_bytes, tens_x=37, units_x=84, y=68)
+            layout_bytes = L.split_minute(layout_bytes, tens_x=149, units_x=196, y=68)
 
         if cfg.get("metrics"):
             atlases: dict[str, list[str]] = {}

@@ -191,11 +191,12 @@ def add_combined_widget(layout: bytes, refs: list[str], x: int, y: int,
     return add_metric(layout, refs, x, y, value_type, data_type, **kwargs)
 
 
-def split_hour(layout: bytes, *, tens_x: int, units_x: int, y: int) -> bytes:
-    """Troca a hora (vt 12) por dezena (59) + unidade (60): 9 vira 09.
+def split_pair(layout: bytes, *, in_vt: int, tens_vt: int, units_vt: int,
+               tens_x: int, units_x: int, y: int,
+               idx_normal: int, idx_aod: int) -> bytes:
+    """Troca um controle combinado por dezena + unidade.
 
-    O controle único suprime o zero à esquerda; com dois controles, a dezena
-    sempre desenha e o relógio mostra 09:58.
+    O controle único suprime zeros à esquerda; dois controles garantem 09 e 01.
     """
     root = read(layout)
     for elem in [f for f in root if f[0] == 1]:
@@ -205,29 +206,42 @@ def split_hour(layout: bytes, *, tens_x: int, units_x: int, y: int) -> bytes:
         layers = [read(f[2]) for f in ef if f[0] == 5]
         out_layers: list[list] = []
         for lf in layers:
-            if get_int(lf, 2) != 3:        # só COMBINED_RES
+            if get_int(lf, 2) != 3:
                 out_layers.append(lf)
                 continue
             cf = read(get(lf, 6)[2])
-            if get_int(cf, 5) != 12:       # só hora
+            if get_int(cf, 5) != in_vt:
                 out_layers.append(lf)
                 continue
             ambient = get_int(cf, 13)
-            set_int(cf, 5, 59)             # hora, dezena
+            set_int(cf, 5, tens_vt)
             set_point(cf, 3, tens_x, y)
-            set_int(cf, 4, 0)              # LEFT
+            set_int(cf, 4, 0)
             set_bytes(lf, 6, write(cf))
 
-            units = read(write(lf))        # cópia profunda
+            units = read(write(lf))
             ucf = read(get(units, 6)[2])
-            set_int(ucf, 5, 60)            # hora, unidade
+            set_int(ucf, 5, units_vt)
             set_point(ucf, 3, units_x, y)
             set_int(ucf, 4, 0)
             set_bytes(units, 6, write(ucf))
-            set_int(units, 1, 3 if ambient == 0 else 7)
+            set_int(units, 1, idx_normal if ambient == 0 else idx_aod)
             out_layers.extend([lf, units])
 
         keep = [f for f in ef if f[0] != 5]
-        keep += [[5, 2, write(lf)] for lf in sorted(out_layers, key=lambda l: get_int(l, 1))]
+        keep += [[5, 2, write(lf)]
+                 for lf in sorted(out_layers, key=lambda l: get_int(l, 1))]
         elem[2] = write(keep)
     return write(root)
+
+
+def split_hour(layout: bytes, *, tens_x: int, units_x: int, y: int) -> bytes:
+    return split_pair(layout, in_vt=12, tens_vt=59, units_vt=60,
+                      tens_x=tens_x, units_x=units_x, y=y,
+                      idx_normal=3, idx_aod=7)
+
+
+def split_minute(layout: bytes, *, tens_x: int, units_x: int, y: int) -> bytes:
+    return split_pair(layout, in_vt=13, tens_vt=61, units_vt=62,
+                      tens_x=tens_x, units_x=units_x, y=y,
+                      idx_normal=8, idx_aod=9)
