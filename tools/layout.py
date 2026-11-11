@@ -245,3 +245,34 @@ def split_minute(layout: bytes, *, tens_x: int, units_x: int, y: int) -> bytes:
     return split_pair(layout, in_vt=13, tens_vt=61, units_vt=62,
                       tens_x=tens_x, units_x=units_x, y=y,
                       idx_normal=8, idx_aod=9)
+
+
+def _ordered_res(refs, x, y, interval, value_type, mode, ambient, version) -> bytes:
+    ordered = bytearray()
+    for ref in refs:
+        ordered += write([[1, 2, ref.encode()]])
+    ordered += write([[2, 2, point(x, y)], [3, 0, interval]])
+    if value_type is not None:
+        ordered += write([[4, 0, value_type]])
+    ordered += write([[5, 0, mode], [8, 0, 0], [9, 0, ambient]])
+    if version is not None:
+        ordered += write([[13, 0, version]])
+    return bytes(ordered)
+
+
+def add_animation_element(layout: bytes, refs: list[str], x: int, y: int, *,
+                          label: int = 3, after_element: int = 0, index: int = 0,
+                          interval: int = 0, mode: int = 1, ambient: int = 0,
+                          value_type: int | None = 154,
+                          version: int | None = 1) -> bytes:
+    """Cria um elemento novo só com a animação, logo acima do fundo."""
+    root = read(layout)
+    elems = [i for i, f in enumerate(root) if f[0] == 1]
+    if len(elems) <= after_element:
+        raise IndexError("elemento inexistente")
+
+    ordered = _ordered_res(refs, x, y, interval, value_type, mode, ambient, version)
+    animated = write([[1, 0, index], [2, 0, 11], [3, 2, ordered]])
+    element = write([[1, 0, label], [2, 0, 0], [9, 2, animated]])
+    root.insert(elems[after_element] + 1, [1, 2, element])
+    return write(root)
