@@ -245,3 +245,32 @@ def split_minute(layout: bytes, *, tens_x: int, units_x: int, y: int) -> bytes:
     return split_pair(layout, in_vt=13, tens_vt=61, units_vt=62,
                       tens_x=tens_x, units_x=units_x, y=y,
                       idx_normal=8, idx_aod=9)
+
+
+def add_animation(layout: bytes, refs: list[str], x: int, y: int, *,
+                  element_index: int = 0, index: int = 0, interval: int = 120,
+                  mode: int = 2, ambient: int = 0,
+                  value_type: int | None = None) -> bytes:
+    """Acrescenta um AnimatedLayer (OrderedRes) a um elemento.
+
+    mode 2 = REVERT (ping-pong). Sem value_type, a sequencia roda pelo
+    intervalo; element_index 0 coloca a animacao no fundo, abaixo da hora.
+    """
+    root = read(layout)
+    elems = [i for i, f in enumerate(root) if f[0] == 1]
+    if len(elems) <= element_index:
+        raise IndexError("elemento inexistente")
+    ef = read(root[elems[element_index]][2])
+
+    ordered = bytearray()
+    for ref in refs:
+        ordered += write([[1, 2, ref.encode()]])
+    ordered += write([[2, 2, point(x, y)], [3, 0, interval]])
+    if value_type is not None:
+        ordered += write([[4, 0, value_type]])
+    ordered += write([[5, 0, mode], [8, 0, 0], [9, 0, ambient]])
+
+    animated = write([[1, 0, index], [2, 0, 11], [3, 2, bytes(ordered)]])
+    ef.append([9, 2, animated])
+    root[elems[element_index]] = [1, 2, write(ef)]
+    return write(root)

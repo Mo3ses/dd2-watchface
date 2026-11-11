@@ -143,6 +143,24 @@ VARIANTS = {
                {"atlas": "banner", "x": 118, "y": 302, "vt": 0, "dt": 10, "align": 0,
                 "box": (114, 300, 110, 36)},
            ]},
+    "v10": {"tile": (47, 74), "colon": (18, 74), "size": 88, "baseline": 0.88,
+            "gradient": ((0xF7, 0xDF, 0xA0), (0xC8, 0x9B, 0x52)),
+            "stroke": (0x2A, 0x12, 0x0A),
+            "layout": "v9", "art": "relic_anim",
+            "banner": {"tile": (18, 32), "size": 30, "baseline": 0.86},
+            "animation": {"x": 55, "y": 120},
+            "metrics": [
+                {"atlas": "value", "x": 60, "y": 344, "vt": 2, "dt": 11, "align": 0,
+                 "box": (56, 340, 96, 44)},
+                {"atlas": "value", "x": 190, "y": 344, "vt": 1, "dt": 12, "align": 0,
+                 "box": (186, 340, 72, 44)},
+                {"atlas": "value", "x": 60, "y": 396, "vt": 4, "dt": 21, "align": 0,
+                 "box": (56, 392, 72, 44)},
+                {"atlas": "value", "x": 228, "y": 396, "vt": 9, "dt": 17, "align": 2,
+                 "box": (184, 392, 72, 44)},
+                {"atlas": "banner", "x": 118, "y": 302, "vt": 0, "dt": 10, "align": 0,
+                 "box": (114, 300, 110, 36)},
+            ]},
 }
 
 
@@ -253,7 +271,9 @@ def main() -> int:
     for index, (name, cfg) in enumerate(VARIANTS.items()):
         tiles = build_tiles(name, cfg, build)
         art = cfg.get("art")
-        if art == "relic":
+        if art == "relic_anim":
+            bg_name, aod_name = "bg_relic_anim.png", "bg_relic_aod.png"
+        elif art == "relic":
             bg_name, aod_name = "bg_relic.png", "bg_relic_aod.png"
         elif art:
             bg_name, aod_name = "bg_art.png", "bg_art_aod.png"
@@ -322,6 +342,20 @@ def main() -> int:
                     layout_bytes, atlases[m.get("atlas", "value")],
                     m["x"], m["y"], m["vt"], m["dt"],
                     index=i, align=m.get("align", 0), box=m.get("box"))
+
+        if cfg.get("animation"):
+            heart_dir = build / "heart"
+            start = len(blobs)
+            frames = sorted(heart_dir.glob("heart_*.png"))
+            if not frames:
+                sys.exit("[anim] frames ausentes; rode tools/heart_anim.py")
+            for p in frames:
+                with Image.open(p) as im:
+                    blobs.append(pil_to_blob(im.convert("RGBA")))
+            refs = [f"{start + i + 1:03d}" for i in range(len(frames))]
+            anim = cfg["animation"]
+            layout_bytes = L.add_animation(layout_bytes, refs, anim["x"], anim["y"],
+                                           interval=anim.get("interval", 120))
 
         override = {}
         if pkg["description"]:
