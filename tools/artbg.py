@@ -36,12 +36,13 @@ GRID = {  # rótulo: (x, baseline)
     "TEMP": (75, 376),
     "BAT": (205, 376),
 }
-BANNER_LABEL = "\u2756 PASSOS"
+BANNER_LABEL = "PASSOS"
 BANNER_BASE = 238
 RULE_BANNER = 292
 RULE_MID = 360
 GRID_TOP, GRID_BOT = 292, 428
-PCT = (224, 416)
+PCT = (226, 416)
+TEMP_PLACEHOLDER = (75, 410)
 
 
 def main() -> int:
@@ -73,10 +74,13 @@ def main() -> int:
                                            radius=10 * S, fill=(0, 0, 0, 150))
     art.alpha_composite(band.filter(ImageFilter.GaussianBlur(10 * S)))
 
-    # banner de passos
+    # banner de passos: losango desenhado (o glifo ❖ não existe na Terminess)
     f_ban = ImageFont.truetype(str(font_path), 10.5 * S)
-    ga.tracked(d, (140 * S - ga.tracked_width(BANNER_LABEL, f_ban, 1.2 * S) / 2, BANNER_BASE * S),
-               BANNER_LABEL, f_ban, (*ga.BRONZE_LT, 255), tracking=1.2 * S)
+    ban_w = ga.tracked_width(BANNER_LABEL, f_ban, 1.2 * S)
+    ban_x = 140 * S - (ban_w + 12 * S) / 2
+    ga.diamond(d, ban_x + 3 * S, (BANNER_BASE - 4) * S, 3.2 * S, (*ga.GOLD, 255), width=2 * S)
+    ga.tracked(d, (ban_x + 12 * S, BANNER_BASE * S), BANNER_LABEL, f_ban,
+               (*ga.BRONZE_LT, 255), tracking=1.2 * S)
     for x0, x1 in ((20, 54), (226, 260)):
         d.line([(x0 * S, 266 * S), (x1 * S, 266 * S)], fill=(*DIV, 255), width=S)
 
@@ -96,6 +100,11 @@ def main() -> int:
 
     # coração do rótulo BPM, à esquerda do texto
     ga.heart(d, 55 * S, 299 * S, 12 * S, (*ga.EMBER, 255))
+
+    # placeholder da temperatura: sem clima sincronizado o container não desenha
+    f_ph = ImageFont.truetype(str(font_path), 18 * S)
+    d.text((TEMP_PLACEHOLDER[0] * S, TEMP_PLACEHOLDER[1] * S), "--", font=f_ph,
+           fill=(*DIV, 255), anchor="ms")
 
     # %
     f_pct = ImageFont.truetype(str(font_path), 13 * S)
