@@ -3,6 +3,8 @@
 Face para **HUAWEI WATCH FIT Special Edition (STA-B39)** — HarmonyOS 2.1,
 AMOLED **280 × 456**, identidade do rice Dragon's Dogma 2.
 
+![Arisen HUD no Watch Fit SE](docs/preview.png)
+
 O projeto tem três camadas independentes:
 
 1. **Arte** (`gen_assets.py`): fundo HUD, brasa, rótulos, atlas de dígitos, AOD,
