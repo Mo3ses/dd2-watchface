@@ -21,9 +21,13 @@ def layer_info(lf: list) -> str:
     bits = [f"idx={L.get_int(lf, 1)}", DRAW.get(draw, str(draw))]
     if body:
         bf = L.read(body[2])
-        vt = L.get_int(bf, 5) or L.get_int(bf, 6) or L.get_int(bf, 3)
-        if vt:
-            bits.append(f"vt={vt}")
+        vt = L.get(bf, 5)
+        if vt is None:
+            vt = L.get(bf, 6)
+        if vt is None:
+            vt = L.get(bf, 3)
+        if vt is not None and isinstance(vt[2], int):
+            bits.append(f"vt={vt[2]}")
         idx = L.get_int(lf, 1)
         pos = L.get(bf, 3) or L.get(bf, 2)
         if pos and pos[1] == 2:
