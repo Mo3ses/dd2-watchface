@@ -31,6 +31,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("hwt")
     ap.add_argument("--time", default="9:11")
+    ap.add_argument("--split-hour", action="store_true",
+                    help="hora em dois controles (dezena 59 + unidade 60), sempre 09")
     ap.add_argument("--values", default=None)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
@@ -50,10 +52,15 @@ def main() -> int:
             x += tiles[ch].width
         return x
 
-    hour_w = tile_w * len(hh)
-    digits(hh, HOUR_END - hour_w, TOP, {str(i): imgs[3 + i] for i in range(10)})
+    hour_tiles = {str(i): imgs[3 + i] for i in range(10)}
+    if args.split_hour:
+        hh = hh.zfill(2)
+        digits(hh[:1], 37, TOP, hour_tiles)
+        digits(hh[1:], 84, TOP, hour_tiles)
+    else:
+        digits(hh, HOUR_END - tile_w * len(hh), TOP, hour_tiles)
     canvas.alpha_composite(imgs[13], (COLON_X, TOP))
-    digits(mm, MIN_X, TOP, {str(i): imgs[3 + i] for i in range(10)})
+    digits(mm, MIN_X, TOP, hour_tiles)
 
     if args.values:
         vals = dict(kv.split("=") for kv in args.values.split(","))

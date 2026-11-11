@@ -189,3 +189,45 @@ def add_metric(layout: bytes, refs: list[str], x: int, y: int,
 def add_combined_widget(layout: bytes, refs: list[str], x: int, y: int,
                         value_type: int, data_type: int, **kwargs) -> bytes:
     return add_metric(layout, refs, x, y, value_type, data_type, **kwargs)
+
+
+def split_hour(layout: bytes, *, tens_x: int, units_x: int, y: int) -> bytes:
+    """Troca a hora (vt 12) por dezena (59) + unidade (60): 9 vira 09.
+
+    O controle único suprime o zero à esquerda; com dois controles, a dezena
+    sempre desenha e o relógio mostra 09:58.
+    """
+    root = read(layout)
+    for elem in [f for f in root if f[0] == 1]:
+        ef = read(elem[2])
+        if get_int(ef, 1) != 1:            # ELEMENT_LABEL_TIME
+            continue
+        layers = [read(f[2]) for f in ef if f[0] == 5]
+        out_layers: list[list] = []
+        for lf in layers:
+            if get_int(lf, 2) != 3:        # só COMBINED_RES
+                out_layers.append(lf)
+                continue
+            cf = read(get(lf, 6)[2])
+            if get_int(cf, 5) != 12:       # só hora
+                out_layers.append(lf)
+                continue
+            ambient = get_int(cf, 13)
+            set_int(cf, 5, 59)             # hora, dezena
+            set_point(cf, 3, tens_x, y)
+            set_int(cf, 4, 0)              # LEFT
+            set_bytes(lf, 6, write(cf))
+
+            units = read(write(lf))        # cópia profunda
+            ucf = read(get(units, 6)[2])
+            set_int(ucf, 5, 60)            # hora, unidade
+            set_point(ucf, 3, units_x, y)
+            set_int(ucf, 4, 0)
+            set_bytes(units, 6, write(ucf))
+            set_int(units, 1, 3 if ambient == 0 else 7)
+            out_layers.extend([lf, units])
+
+        keep = [f for f in ef if f[0] != 5]
+        keep += [[5, 2, write(lf)] for lf in sorted(out_layers, key=lambda l: get_int(l, 1))]
+        elem[2] = write(keep)
+    return write(root)

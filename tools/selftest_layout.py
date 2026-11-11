@@ -66,6 +66,18 @@ def main() -> int:
     assert L.read(L.get(minute, 3)[2])[0][2] == 257
     print("[ok] fix_time_alignment: hora/minuto RIGHT, dois-pontos em 128")
 
+    split = L.split_hour(fixed, tens_x=37, units_x=84, y=68)
+    elems = [L.read(f[2]) for f in L.read(split) if f[0] == 1]
+    layers = [L.read(f[2]) for f in elems[0] if f[0] == 5]
+    vts = []
+    for lf in layers:
+        body = L.get(lf, 6)
+        vts.append(L.get_int(L.read(body[2]), 5) if body else None)
+    assert 59 in vts and 60 in vts, vts
+    assert 12 not in vts, vts
+    assert len(vts) == 4, vts
+    print("[ok] split_hour: dezena 59 + unidade 60, sem vt 12")
+
     with_metric = L.add_metric(fixed, REFS, 24, 300, 2, 11, index=0, align=0,
                                box=(24, 296, 104, 48))
     elems = [L.read(f[2]) for f in L.read(with_metric) if f[0] == 1]
