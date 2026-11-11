@@ -1,0 +1,8 @@
+{
+  "_comment": "indice do slot devolvido por tools/inspect_hwt.py -> arquivo dentro de build/",
+  "slots": {
+    "0": "bg.png",
+    "1": "time/2.png",
+    "2": "time/3.png"
+  }
+}
