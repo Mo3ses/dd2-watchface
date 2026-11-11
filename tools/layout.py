@@ -119,8 +119,10 @@ def set_point(fields, num, x, y):
 
 
 # ---------------------------------------------------------------- edits
-def fix_time_alignment(layout: bytes) -> bytes:
-    """Hora/minuto ancorados à direita do próprio bloco: 9 e 09 caem no mesmo lugar."""
+def fix_time_alignment(layout: bytes, *, hour_x: int = 127, colon_x: int = 128,
+                       minute_x: int = 257, y: int = 103,
+                       hour_align: int = 2, minute_align: int = 2) -> bytes:
+    """Hora/minuto ancorados à direita (ou centro) do próprio bloco."""
     root = read(layout)
     for elem in [f for f in root if f[0] == 1]:
         ef = read(elem[2])
@@ -134,11 +136,11 @@ def fix_time_alignment(layout: bytes) -> bytes:
                 cf = read(body[2])
                 vt = get_int(cf, 5)
                 if vt == 12:                # hora
-                    set_point(cf, 3, 127, 103)
-                    set_int(cf, 4, 2)       # RIGHT
+                    set_point(cf, 3, hour_x, y)
+                    set_int(cf, 4, hour_align)
                 elif vt == 13:              # minuto
-                    set_point(cf, 3, 257, 103)
-                    set_int(cf, 4, 2)
+                    set_point(cf, 3, minute_x, y)
+                    set_int(cf, 4, minute_align)
                 else:
                     continue
                 set_bytes(layer, 6, write(cf))
@@ -148,7 +150,7 @@ def fix_time_alignment(layout: bytes) -> bytes:
                 ref = get(sf, 1)
                 if not ref or ref[2] not in (b"014", b"025"):
                     continue
-                set_point(sf, 2, 128, 103)
+                set_point(sf, 2, colon_x, y)
                 set_bytes(layer, 4, write(sf))
             else:
                 continue

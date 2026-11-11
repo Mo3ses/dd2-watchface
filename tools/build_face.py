@@ -12,11 +12,15 @@ Aqui a gente troca a pele e, quando a variante pede, corrige o layout.
     slot  13       dois-pontos normal
     slots 14..23   digitos AOD
     slot  24       dois-pontos AOD
+    slots 25..     atlas de valores (34px) e do banner (30px)
 
 Variantes:
     v0  digitos 50x53 (medida do seed)
     v1  digitos 51x111 (relogio grande)
-    v2  v1 + hora/minuto ancorados a direita (9 e 09 no mesmo lugar)
+    v2  v1 + hora/minuto ancorados a direita
+    v3  v2 + containers de batimento e bateria
+    v4  v3 + arte do fundo.jpg como plano de fundo
+    v5  layout final: hora alta, banner de passos, grid 2x2, 5 metricas
 
     python tools/build_face.py
 """
@@ -50,9 +54,9 @@ VARIANTS = {
     "v3": {"tile": (51, 111), "colon": (20, 111), "size": 94, "layout": "align",
            "metrics": [
                {"x": 24, "y": 306, "vt": 2, "dt": 11, "align": 0,
-                "box": (24, 300, 104, 48)},    # heart rate
+                "box": (24, 300, 104, 48)},
                {"x": 246, "y": 387, "vt": 9, "dt": 17, "align": 2,
-                "box": (152, 381, 96, 48)},    # battery / power
+                "box": (152, 381, 96, 48)},
            ]},
     "v4": {"tile": (51, 111), "colon": (20, 111), "size": 94, "layout": "align",
            "art": True,
@@ -62,23 +66,41 @@ VARIANTS = {
                {"x": 246, "y": 372, "vt": 9, "dt": 17, "align": 2,
                 "box": (152, 368, 96, 48)},
            ]},
+    "v5": {"tile": (47, 74), "colon": (18, 74), "size": 88, "baseline": 0.88,
+           "layout": "v5", "art": True,
+           "banner": {"tile": (18, 32), "size": 30, "baseline": 0.86},
+           "metrics": [
+               {"atlas": "value", "x": 75, "y": 310, "vt": 2, "dt": 11, "align": 1,
+                "box": (24, 306, 102, 48)},
+               {"atlas": "value", "x": 205, "y": 310, "vt": 1, "dt": 12, "align": 1,
+                "box": (152, 306, 102, 48)},
+               {"atlas": "value", "x": 75, "y": 382, "vt": 4, "dt": 21, "align": 1,
+                "box": (24, 378, 102, 48)},
+               {"atlas": "value", "x": 214, "y": 382, "vt": 9, "dt": 17, "align": 2,
+                "box": (152, 378, 102, 48)},
+               {"atlas": "banner", "x": 140, "y": 250, "vt": 0, "dt": 10, "align": 1,
+                "box": (60, 246, 160, 40)},
+           ]},
 }
 
 
-def render(ch: str, w: int, h: int, size: int, color, colon: bool = False) -> Image.Image:
+def render(ch: str, w: int, h: int, size: int, color, colon: bool = False,
+           baseline: float = 0.78) -> Image.Image:
     img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     font = ImageFont.truetype(str(FONT), size * SS)
     if colon:
         d.text((w * SS / 2, h * SS * 0.47), ch, font=font, fill=(*color, 255), anchor="mm")
     else:
-        d.text((w * SS / 2, h * SS * 0.78), ch, font=font, fill=(*color, 255), anchor="ms")
+        d.text((w * SS / 2, h * SS * baseline), ch, font=font,
+               fill=(*color, 255), anchor="ms")
     return img.resize((w, h), Image.Resampling.LANCZOS)
 
 
 def build_tiles(name: str, cfg: dict, build: Path) -> dict[str, list[Path]]:
     tw, th = cfg["tile"]
     cw, chh = cfg["colon"]
+    base = cfg.get("baseline", 0.78)
     paths: dict[str, list[Path]] = {}
     for sub, color in (("normal", ga.GOLD), ("aod", ga.AOD_GOLD)):
         out = build / f"tiles_{name}_{sub}"
@@ -86,13 +108,37 @@ def build_tiles(name: str, cfg: dict, build: Path) -> dict[str, list[Path]]:
         digits = []
         for i in range(10):
             p = out / f"{i}.png"
-            render(str(i), tw, th, cfg["size"], color).save(p)
+            render(str(i), tw, th, cfg["size"], color, baseline=base).save(p)
             digits.append(p)
         colon = out / "colon.png"
         render(":", cw, chh, cfg["size"], color, colon=True).save(colon)
         paths[sub] = digits
         paths[f"{sub}_colon"] = [colon]
     return paths
+
+
+def build_banner(name: str, cfg: dict, build: Path) -> list[Path]:
+    tw, th = cfg["tile"]
+    base = cfg.get("baseline", 0.86)
+    out = build / f"tiles_{name}_banner"
+    out.mkdir(parents=True, exist_ok=True)
+    digits = []
+    for i in range(10):
+        p = out / f"{i}.png"
+        render(str(i), tw, th, cfg["size"], ga.GOLD, baseline=base).save(p)
+        digits.append(p)
+    return digits
+
+
+def bump_description(desc: bytes, index: int) -> bytes:
+    import re
+    hit = re.search(rb"<version>(\d+)\.(\d+)\.(\d+)</version>", desc)
+    if not hit:
+        return desc
+    z = int(hit.group(3)) + index
+    return desc.replace(hit.group(0),
+                        f"<version>{hit.group(1).decode()}."
+                        f"{hit.group(2).decode()}.{z}</version>".encode())
 
 
 def main() -> int:
@@ -114,7 +160,7 @@ def main() -> int:
     info = parse_bin(pkg["bin"])
     print(f"[seed] {len(info['images'])} slots, layout {len(info['layout'])} B")
 
-    for name, cfg in VARIANTS.items():
+    for index, (name, cfg) in enumerate(VARIANTS.items()):
         tiles = build_tiles(name, cfg, build)
         mapping: dict[int, Path] = {
             SLOTS["thumb"]: build / "thumb.png",
@@ -140,30 +186,35 @@ def main() -> int:
         layout_bytes = info["layout"]
         if cfg.get("layout") == "align":
             layout_bytes = L.fix_time_alignment(layout_bytes)
+        elif cfg.get("layout") == "v5":
+            layout_bytes = L.fix_time_alignment(layout_bytes, hour_x=131, colon_x=131,
+                                                minute_x=149, y=68, minute_align=0)
 
         if cfg.get("metrics"):
-            vdir = build / "value"
-            start = len(blobs)
-            for i in range(10):
-                with Image.open(vdir / f"{i}.png") as im:
-                    blobs.append(pil_to_blob(im.convert("RGBA")))
-            refs = [f"{start + i + 1:03d}" for i in range(10)]
+            atlases: dict[str, list[str]] = {}
+            kinds = {m.get("atlas", "value") for m in cfg["metrics"]}
+            if "value" in kinds:
+                start = len(blobs)
+                for i in range(10):
+                    with Image.open(build / "value" / f"{i}.png") as im:
+                        blobs.append(pil_to_blob(im.convert("RGBA")))
+                atlases["value"] = [f"{start + i + 1:03d}" for i in range(10)]
+            if "banner" in kinds:
+                bdigits = build_banner(name, cfg["banner"], build)
+                start = len(blobs)
+                for p in bdigits:
+                    with Image.open(p) as im:
+                        blobs.append(pil_to_blob(im.convert("RGBA")))
+                atlases["banner"] = [f"{start + i + 1:03d}" for i in range(10)]
             for i, m in enumerate(cfg["metrics"]):
                 layout_bytes = L.add_metric(
-                    layout_bytes, refs, m["x"], m["y"], m["vt"], m["dt"],
+                    layout_bytes, atlases[m.get("atlas", "value")],
+                    m["x"], m["y"], m["vt"], m["dt"],
                     index=i, align=m.get("align", 0), box=m.get("box"))
 
         override = {}
         if pkg["description"]:
-            import re
-            desc = pkg["description"]
-            hit = re.search(rb"<version>(\d+)\.(\d+)\.(\d+)</version>", desc)
-            if hit:
-                z = int(hit.group(3)) + list(VARIANTS).index(name)
-                desc = desc.replace(hit.group(0),
-                                    f"<version>{hit.group(1).decode()}."
-                                    f"{hit.group(2).decode()}.{z}</version>".encode())
-                override["description.xml"] = desc
+            override["description.xml"] = bump_description(pkg["description"], index)
 
         new_bin = build_bin(info["version"], layout_bytes, blobs,
                             signature=info["signature"], reserved=info["reserved"])

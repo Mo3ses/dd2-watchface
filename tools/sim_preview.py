@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-sim_preview.py — simula o que o relogio desenha, usando os slots do .hwt
+sim_preview.py — simula o que o relógio desenha, usando os slots do .hwt
 
-    python tools/sim_preview.py out/ARISEN_HUD_v2.hwt --time 9:11
+    python tools/sim_preview.py out/ARISEN_HUD_v5.hwt --time 9:11 \
+        --values "hr=62,cal=412,temp=24,bat=87,steps=8420"
 
-Coordenadas do layout HWHD06 (v2, ancorado a direita):
-hora termina em x=127, dois-pontos em 128, minuto termina em 257, topo y=103.
+Coordenadas do layout final (v5):
+hora termina em 131, dois-pontos em 131, minuto começa em 149, topo y=68.
+Valores: BPM/CAL em y=310 (centros 75/205), TEMP/BAT em y=382 (75/214),
+passos centrados em 140, y=250.
 """
 from __future__ import annotations
 
@@ -18,15 +21,16 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hwformat import image_to_pil, load_package, parse_bin  # noqa: E402
 
-HOUR_END, COLON_X, MIN_END, TOP = 127, 128, 257, 103
+HOUR_END, COLON_X, MIN_X, TOP = 131, 131, 149, 68
+ROW1, ROW2 = 310, 382
+STEPS_Y = 250
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("hwt")
     ap.add_argument("--time", default="9:11")
-    ap.add_argument("--values", default=None,
-                    help="hr=62,cal=412,temp=24,bat=87 (so desenha, nao vem do layout)")
+    ap.add_argument("--values", default=None)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -34,41 +38,45 @@ def main() -> int:
     pkg = load_package(path)
     info = parse_bin(pkg["bin"])
     imgs = {s["index"]: image_to_pil(s["blob"]) for s in info["images"] if s["size"]}
-    bg = imgs.get(1)
-    if bg is None:
-        sys.exit("slot 1 (fundo) vazio")
-    canvas = bg.copy()
+    canvas = imgs[1].copy()
     tile_w = imgs[3].width
 
     hh, mm = args.time.split(":")
 
-    def draw_num(text: str, end_x: int, slot_base: int = 3) -> None:
-        x = end_x - tile_w * len(text)
+    def digits(text: str, x: int, y: int, tiles: dict[str, Image.Image]) -> int:
         for ch in text:
-            canvas.alpha_composite(imgs[slot_base + int(ch)], (x, TOP))
-            x += tile_w
+            canvas.alpha_composite(tiles[ch], (x, y))
+            x += tiles[ch].width
+        return x
 
-    draw_num(hh, HOUR_END)
+    hour_w = tile_w * len(hh)
+    digits(hh, HOUR_END - hour_w, TOP, {str(i): imgs[3 + i] for i in range(10)})
     canvas.alpha_composite(imgs[13], (COLON_X, TOP))
-    draw_num(mm, MIN_END)
+    digits(mm, MIN_X, TOP, {str(i): imgs[3 + i] for i in range(10)})
 
     if args.values:
         vals = dict(kv.split("=") for kv in args.values.split(","))
         vdir = Path(__file__).resolve().parent.parent / "build" / "value"
-        tiles = {str(i): Image.open(vdir / f"{i}.png").convert("RGBA") for i in range(10)}
+        vt = {str(i): Image.open(vdir / f"{i}.png").convert("RGBA") for i in range(10)}
 
-        def num(text: str, x: int, y: int, right: int | None = None) -> None:
-            w = sum(tiles[c].width for c in text)
-            if right is not None:
-                x = right - w
-            for c in text:
-                canvas.alpha_composite(tiles[c], (x, y))
-                x += tiles[c].width
+        def center(text: str, cx: int, y: int) -> None:
+            w = sum(vt[c].width for c in text)
+            digits(text, cx - w // 2, y, vt)
 
-        num(vals.get("hr", "62"), 24, 300)
-        num(vals.get("cal", "412"), 152, 300)
-        num(vals.get("temp", "24"), 24, 372)
-        num(vals.get("bat", "87"), 0, 372, right=246)
+        def right(text: str, x: int, y: int) -> None:
+            w = sum(vt[c].width for c in text)
+            digits(text, x - w, y, vt)
+
+        center(vals.get("hr", "62"), 75, ROW1)
+        center(vals.get("cal", "412"), 205, ROW1)
+        center(vals.get("temp", "24"), 75, ROW2)
+        right(vals.get("bat", "87"), 214, ROW2)
+
+        if "steps" in vals:
+            bdir = Path(__file__).resolve().parent.parent / "build" / "tiles_v5_banner"
+            if bdir.exists():
+                bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA") for i in range(10)}
+                center(vals["steps"], 140, STEPS_Y)
 
     out = Path(args.out) if args.out else path.with_name(path.stem + "_sim.png")
     canvas.save(out)
