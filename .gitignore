@@ -1,0 +1,15 @@
+# artefatos gerados
+build/
+out/
+__pycache__/
+*.pyc
+
+# seeds e referências de terceiros (não redistribuir)
+base/
+*.hwt
+*.bin
+
+# fonte licenciada
+fonts/
+*.ttf
+*.otf
