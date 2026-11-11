@@ -21,7 +21,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hwformat import image_to_pil, load_package, parse_bin  # noqa: E402
 
-HOUR_END, COLON_X, MIN_X, TOP = 131, 131, 149, 68
+HOUR_END, COLON_X, MIN_X, top = 131, 131, 149, 68
 ROW1, ROW2 = 334, 406
 BAT_X, STEPS_Y = 222, 266
 STEPS_Y = 250
@@ -36,6 +36,7 @@ def main() -> int:
     ap.add_argument("--split-minute", action="store_true",
                     help="minuto em dois controles (dezena 61 + unidade 62), sempre 01")
     ap.add_argument("--values", default=None)
+    ap.add_argument("--v9", action="store_true", help="posicoes do Relic HUD")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -46,6 +47,7 @@ def main() -> int:
     canvas = imgs[1].copy()
     tile_w = imgs[3].width
 
+    top = 64 if args.v9 else TOP
     hh, mm = args.time.split(":")
 
     def digits(text: str, x: int, y: int, tiles: dict[str, Image.Image]) -> int:
@@ -57,17 +59,17 @@ def main() -> int:
     hour_tiles = {str(i): imgs[3 + i] for i in range(10)}
     if args.split_hour:
         hh = hh.zfill(2)
-        digits(hh[:1], 37, TOP, hour_tiles)
-        digits(hh[1:], 84, TOP, hour_tiles)
+        digits(hh[:1], 37, top, hour_tiles)
+        digits(hh[1:], 84, top, hour_tiles)
     else:
-        digits(hh, HOUR_END - tile_w * len(hh), TOP, hour_tiles)
-    canvas.alpha_composite(imgs[13], (COLON_X, TOP))
+        digits(hh, HOUR_END - tile_w * len(hh), top, hour_tiles)
+    canvas.alpha_composite(imgs[13], (COLON_X, top))
     if args.split_minute:
         mm = mm.zfill(2)
-        digits(mm[:1], 149, TOP, hour_tiles)
-        digits(mm[1:], 196, TOP, hour_tiles)
+        digits(mm[:1], 149, top, hour_tiles)
+        digits(mm[1:], 196, top, hour_tiles)
     else:
-        digits(mm, MIN_X, TOP, hour_tiles)
+        digits(mm, MIN_X, top, hour_tiles)
 
     if args.values:
         vals = dict(kv.split("=") for kv in args.values.split(","))
@@ -85,20 +87,36 @@ def main() -> int:
             w = sum(vt[c].width for c in text)
             digits(text, x - w, y, vt)
 
-        if vals.get("hr"):
-            center(vals["hr"], 75, ROW1)
-        if vals.get("cal"):
-            center(vals["cal"], 205, ROW1)
-        if vals.get("temp"):
-            center(vals["temp"], 75, ROW2)
-        if vals.get("bat"):
-            right(vals["bat"], BAT_X, ROW2 - 20)
-
-        if vals.get("steps"):
-            bdir = Path(__file__).resolve().parent.parent / "build" / "tiles_v5_banner"
-            if bdir.exists():
-                bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA") for i in range(10)}
-                center(vals["steps"], 140, STEPS_Y, bt)
+        if args.v9:
+            if vals.get("hr"):
+                digits(vals["hr"], 60, 344, vt)
+            if vals.get("cal"):
+                digits(vals["cal"], 190, 344, vt)
+            if vals.get("temp"):
+                digits(vals["temp"], 60, 396, vt)
+            if vals.get("bat"):
+                right(vals["bat"], 228, 396)
+            if vals.get("steps"):
+                bdir = Path(__file__).resolve().parent.parent / "build" / "tiles_v9_banner"
+                if bdir.exists():
+                    bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA")
+                          for i in range(10)}
+                    digits(vals["steps"], 118, 302, bt)
+        else:
+            if vals.get("hr"):
+                center(vals["hr"], 75, ROW1)
+            if vals.get("cal"):
+                center(vals["cal"], 205, ROW1)
+            if vals.get("temp"):
+                center(vals["temp"], 75, ROW2)
+            if vals.get("bat"):
+                right(vals["bat"], BAT_X, ROW2 - 20)
+            if vals.get("steps"):
+                bdir = Path(__file__).resolve().parent.parent / "build" / "tiles_v5_banner"
+                if bdir.exists():
+                    bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA")
+                          for i in range(10)}
+                    center(vals["steps"], 140, STEPS_Y, bt)
 
     out = Path(args.out) if args.out else path.with_name(path.stem + "_sim.png")
     canvas.save(out)
@@ -108,3 +126,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -126,19 +126,48 @@ VARIANTS = {
                {"atlas": "banner", "x": 140, "y": 266, "vt": 0, "dt": 10, "align": 1,
                 "box": (60, 246, 160, 40)},
            ]},
+    "v9": {"tile": (47, 74), "colon": (18, 74), "size": 88, "baseline": 0.88,
+           "gradient": ((0xF7, 0xDF, 0xA0), (0xC8, 0x9B, 0x52)),
+           "stroke": (0x2A, 0x12, 0x0A),
+           "layout": "v9", "art": "relic",
+           "banner": {"tile": (18, 32), "size": 30, "baseline": 0.86},
+           "metrics": [
+               {"atlas": "value", "x": 60, "y": 344, "vt": 2, "dt": 11, "align": 0,
+                "box": (56, 340, 96, 44)},
+               {"atlas": "value", "x": 190, "y": 344, "vt": 1, "dt": 12, "align": 0,
+                "box": (186, 340, 72, 44)},
+               {"atlas": "value", "x": 60, "y": 396, "vt": 4, "dt": 21, "align": 0,
+                "box": (56, 392, 72, 44)},
+               {"atlas": "value", "x": 228, "y": 396, "vt": 9, "dt": 17, "align": 2,
+                "box": (184, 392, 72, 44)},
+               {"atlas": "banner", "x": 118, "y": 302, "vt": 0, "dt": 10, "align": 0,
+                "box": (114, 300, 110, 36)},
+           ]},
 }
 
 
 def render(ch: str, w: int, h: int, size: int, color, colon: bool = False,
-           baseline: float = 0.78) -> Image.Image:
+           baseline: float = 0.78, gradient=None, stroke=None) -> Image.Image:
     img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     font = ImageFont.truetype(str(FONT), size * SS)
-    if colon:
-        d.text((w * SS / 2, h * SS * 0.47), ch, font=font, fill=(*color, 255), anchor="mm")
+    xy = (w * SS / 2, h * SS * 0.47) if colon else (w * SS / 2, h * SS * baseline)
+    anchor = "mm" if colon else "ms"
+    if gradient:
+        d.text(xy, ch, font=font, fill=(0, 0, 0, 255), anchor=anchor,
+               stroke_width=SS, stroke_fill=(*(stroke or (0x2A, 0x12, 0x0A)), 255))
+        mask = Image.new("L", img.size, 0)
+        ImageDraw.Draw(mask).text(xy, ch, font=font, fill=255, anchor=anchor)
+        grad = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        gd = ImageDraw.Draw(grad)
+        for y in range(img.height):
+            t = y / max(1, img.height - 1)
+            col = tuple(int(gradient[0][i] + (gradient[1][i] - gradient[0][i]) * t)
+                        for i in range(3))
+            gd.line([(0, y), (img.width, y)], fill=(*col, 255))
+        img = Image.composite(grad, img, mask)
     else:
-        d.text((w * SS / 2, h * SS * baseline), ch, font=font,
-               fill=(*color, 255), anchor="ms")
+        d.text(xy, ch, font=font, fill=(*color, 255), anchor=anchor)
     return img.resize((w, h), Image.Resampling.LANCZOS)
 
 
@@ -150,10 +179,13 @@ def build_tiles(name: str, cfg: dict, build: Path) -> dict[str, list[Path]]:
     for sub, color in (("normal", ga.GOLD), ("aod", ga.AOD_GOLD)):
         out = build / f"tiles_{name}_{sub}"
         out.mkdir(parents=True, exist_ok=True)
+        gradient = cfg.get("gradient") if sub == "normal" else None
+        stroke = cfg.get("stroke") if sub == "normal" else None
         digits = []
         for i in range(10):
             p = out / f"{i}.png"
-            render(str(i), tw, th, cfg["size"], color, baseline=base).save(p)
+            render(str(i), tw, th, cfg["size"], color, baseline=base,
+                   gradient=gradient, stroke=stroke).save(p)
             digits.append(p)
         colon = out / "colon.png"
         render(":", cw, chh, cfg["size"], color, colon=True).save(colon)
@@ -220,10 +252,17 @@ def main() -> int:
 
     for index, (name, cfg) in enumerate(VARIANTS.items()):
         tiles = build_tiles(name, cfg, build)
+        art = cfg.get("art")
+        if art == "relic":
+            bg_name, aod_name = "bg_relic.png", "bg_relic_aod.png"
+        elif art:
+            bg_name, aod_name = "bg_art.png", "bg_art_aod.png"
+        else:
+            bg_name, aod_name = "bg.png", "bg_aod_plain.png"
         mapping: dict[int, Path] = {
             SLOTS["thumb"]: build / "thumb.png",
-            SLOTS["bg"]: build / ("bg_art.png" if cfg.get("art") else "bg.png"),
-            SLOTS["aod_bg"]: build / ("bg_art_aod.png" if cfg.get("art") else "bg_aod_plain.png"),
+            SLOTS["bg"]: build / bg_name,
+            SLOTS["aod_bg"]: build / aod_name,
         }
         for i, idx in enumerate(SLOTS["digits"]):
             mapping[idx] = tiles["normal"][i]
@@ -256,6 +295,11 @@ def main() -> int:
                                                 minute_x=149, y=68, minute_align=0)
             layout_bytes = L.split_hour(layout_bytes, tens_x=37, units_x=84, y=68)
             layout_bytes = L.split_minute(layout_bytes, tens_x=149, units_x=196, y=68)
+        elif cfg.get("layout") == "v9":
+            layout_bytes = L.fix_time_alignment(layout_bytes, hour_x=131, colon_x=131,
+                                                minute_x=149, y=64, minute_align=0)
+            layout_bytes = L.split_hour(layout_bytes, tens_x=37, units_x=84, y=64)
+            layout_bytes = L.split_minute(layout_bytes, tens_x=149, units_x=196, y=64)
 
         if cfg.get("metrics"):
             atlases: dict[str, list[str]] = {}
