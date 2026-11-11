@@ -163,6 +163,25 @@ VARIANTS = {
                 {"atlas": "banner", "x": 118, "y": 302, "vt": 0, "dt": 10, "align": 0,
                  "box": (114, 300, 110, 36)},
             ]},
+    "v12": {"tile": (47, 74), "colon": (18, 74), "size": 88, "baseline": 0.88,
+            "gradient": ((0xF7, 0xDF, 0xA0), (0xC8, 0x9B, 0x52)),
+            "stroke": (0x2A, 0x12, 0x0A),
+            "layout": "v9", "art": "relic",
+            "banner": {"tile": (18, 32), "size": 30, "baseline": 0.86},
+            "animation": {"x": 55, "y": 120, "glow": True, "in_element": 0,
+                          "value_type": 154, "mode": 1, "version": 1, "interval": 0},
+            "metrics": [
+                {"atlas": "value", "x": 60, "y": 344, "vt": 2, "dt": 11, "align": 0,
+                 "box": (56, 340, 96, 44)},
+                {"atlas": "value", "x": 190, "y": 344, "vt": 1, "dt": 12, "align": 0,
+                 "box": (186, 340, 72, 44)},
+                {"atlas": "value", "x": 60, "y": 396, "vt": 4, "dt": 21, "align": 0,
+                 "box": (56, 392, 72, 44)},
+                {"atlas": "value", "x": 228, "y": 396, "vt": 9, "dt": 17, "align": 2,
+                 "box": (184, 392, 72, 44)},
+                {"atlas": "banner", "x": 118, "y": 302, "vt": 0, "dt": 10, "align": 0,
+                 "box": (114, 300, 110, 36)},
+            ]},
 }
 
 
@@ -354,12 +373,21 @@ def main() -> int:
                 with Image.open(p) as im:
                     blobs.append(pil_to_blob(im.convert("RGBA")))
             refs = [f"{start + i + 1:03d}" for i in range(len(frames))]
-            layout_bytes = L.add_animation_element(
-                layout_bytes, refs, anim["x"], anim["y"],
-                label=anim.get("label", 3), after_element=anim.get("after", 0),
-                interval=anim.get("interval", 0), mode=anim.get("mode", 1),
-                value_type=anim.get("value_type", 154),
-                version=anim.get("version", 1))
+            if "in_element" in anim:
+                layout_bytes = L.add_animation(
+                    layout_bytes, refs, anim["x"], anim["y"],
+                    element_index=anim["in_element"],
+                    interval=anim.get("interval", 0),
+                    mode=anim.get("mode", 1),
+                    value_type=anim.get("value_type", 154),
+                    version=anim.get("version", 1))
+            else:
+                layout_bytes = L.add_animation_element(
+                    layout_bytes, refs, anim["x"], anim["y"],
+                    label=anim.get("label", 3), after_element=anim.get("after", 0),
+                    interval=anim.get("interval", 0), mode=anim.get("mode", 1),
+                    value_type=anim.get("value_type", 154),
+                    version=anim.get("version", 1))
 
         override = {}
         if pkg["description"]:

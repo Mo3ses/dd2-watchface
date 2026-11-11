@@ -260,6 +260,24 @@ def _ordered_res(refs, x, y, interval, value_type, mode, ambient, version) -> by
     return bytes(ordered)
 
 
+def add_animation(layout: bytes, refs: list[str], x: int, y: int, *,
+                  element_index: int = 0, index: int = 0, interval: int = 0,
+                  mode: int = 1, ambient: int = 0,
+                  value_type: int | None = 154,
+                  version: int | None = 1) -> bytes:
+    """Acrescenta o AnimatedLayer a um elemento existente (ex.: o fundo)."""
+    root = read(layout)
+    elems = [i for i, f in enumerate(root) if f[0] == 1]
+    if len(elems) <= element_index:
+        raise IndexError("elemento inexistente")
+    ef = read(root[elems[element_index]][2])
+    ordered = _ordered_res(refs, x, y, interval, value_type, mode, ambient, version)
+    animated = write([[1, 0, index], [2, 0, 11], [3, 2, ordered]])
+    ef.append([9, 2, animated])
+    root[elems[element_index]] = [1, 2, write(ef)]
+    return write(root)
+
+
 def add_animation_element(layout: bytes, refs: list[str], x: int, y: int, *,
                           label: int = 3, after_element: int = 0, index: int = 0,
                           interval: int = 0, mode: int = 1, ambient: int = 0,
