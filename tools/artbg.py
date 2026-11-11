@@ -41,7 +41,7 @@ BANNER_BASE = 238
 RULE_BANNER = 292
 RULE_MID = 360
 GRID_TOP, GRID_BOT = 292, 428
-PCT = (218, 412)
+PCT = (224, 416)
 
 
 def main() -> int:

@@ -81,6 +81,21 @@ VARIANTS = {
                {"atlas": "banner", "x": 140, "y": 250, "vt": 0, "dt": 10, "align": 1,
                 "box": (60, 246, 160, 40)},
            ]},
+    "v6": {"tile": (47, 74), "colon": (18, 74), "size": 88, "baseline": 0.88,
+           "layout": "v5", "art": True,
+           "banner": {"tile": (18, 32), "size": 30, "baseline": 0.86},
+           "metrics": [
+               {"atlas": "value", "x": 75, "y": 318, "vt": 2, "dt": 11, "align": 1,
+                "box": (24, 314, 102, 48)},
+               {"atlas": "value", "x": 205, "y": 318, "vt": 1, "dt": 12, "align": 1,
+                "box": (152, 314, 102, 48)},
+               {"atlas": "value", "x": 75, "y": 386, "vt": 4, "dt": 21, "align": 1,
+                "box": (24, 382, 102, 48)},
+               {"atlas": "value", "x": 220, "y": 386, "vt": 9, "dt": 17, "align": 2,
+                "box": (152, 382, 102, 48)},
+               {"atlas": "banner", "x": 140, "y": 250, "vt": 0, "dt": 10, "align": 1,
+                "box": (60, 246, 160, 40)},
+           ]},
 }
 
 

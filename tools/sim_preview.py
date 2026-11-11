@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hwformat import image_to_pil, load_package, parse_bin  # noqa: E402
 
 HOUR_END, COLON_X, MIN_X, TOP = 131, 131, 149, 68
-ROW1, ROW2 = 310, 382
+ROW1, ROW2 = 318, 386
 STEPS_Y = 250
 
 
@@ -70,7 +70,7 @@ def main() -> int:
         center(vals.get("hr", "62"), 75, ROW1)
         center(vals.get("cal", "412"), 205, ROW1)
         center(vals.get("temp", "24"), 75, ROW2)
-        right(vals.get("bat", "87"), 214, ROW2)
+        right(vals.get("bat", "87"), 220, ROW2)
 
         if "steps" in vals:
             bdir = Path(__file__).resolve().parent.parent / "build" / "tiles_v5_banner"
