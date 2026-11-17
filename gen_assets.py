@@ -59,7 +59,8 @@ TIME_BASE   = 176
 ORN_Y       = 204
 TIME_MAX_W  = 236
 
-WEEKDAYS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]
+# ordem do firmware: value 1 = segunda ... 7 = domingo (confirmado no relógio)
+WEEKDAYS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"]
 MONTHS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN",
           "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
 

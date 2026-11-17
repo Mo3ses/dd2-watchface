@@ -29,6 +29,7 @@ Variantes:
 """
 from __future__ import annotations
 
+import datetime as dt
 import sys
 from pathlib import Path
 
@@ -42,6 +43,7 @@ sys.path.insert(0, str(PROJECT))
 sys.path.insert(0, str(TOOLS))
 import gen_assets as ga  # noqa: E402
 import layout as L  # noqa: E402
+import sim_preview  # noqa: E402
 from hwformat import build_bin, load_package, parse_bin, pil_to_blob, save_package  # noqa: E402
 
 SLOTS = {
@@ -380,6 +382,20 @@ def main() -> int:
 
         new_bin = build_bin(info["version"], layout_bytes, blobs,
                             signature=info["signature"], reserved=info["reserved"])
+
+        if cfg.get("date"):
+            # thumbnail do seletor: renderiza a propria face (data de hoje)
+            thumb = sim_preview.render(
+                parse_bin(new_bin), time="10:08",
+                values={"hr": "62", "cal": "412", "temp": "24",
+                        "bat": "87", "steps": "3676"},
+                v9=True, split_hour=True, split_minute=True,
+                date=dt.date.today().isoformat(), build=build)
+            thumb = thumb.resize((156, 256), Image.Resampling.LANCZOS)
+            blobs[0] = pil_to_blob(thumb.convert("RGBA"))
+            new_bin = build_bin(info["version"], layout_bytes, blobs,
+                                signature=info["signature"], reserved=info["reserved"])
+
         dest = out / f"ARISEN_HUD_{name}.hwt"
         save_package(pkg, new_bin, dest, overrides=override)
         print(f"[{name}] {dest}  ({len(new_bin)} B de binario)")

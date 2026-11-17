@@ -76,7 +76,8 @@ python tools/mockup.py out\ARISEN_HUD_v13_sim.png out\preview_v13.png
 
 A face para instalar é `out/ARISEN_HUD_v13.hwt`. O `--date` da simulação lê o
 elemento `DATE` do próprio layout (refs e posições), então ele também serve de
-teste do pacote.
+teste do pacote. A v13 regrava o thumbnail do seletor (slot 0) com a face
+renderizada e a data do build.
 
 Variantes:
 
@@ -106,8 +107,10 @@ RSA entrou no 6.0.0.328+.
 ## limites conhecidos
 
 - **caloria**: o id não está resolvido (1 ou 3, ambos ambíguos na documentação).
-- **data**: a ordem dos índices de semana/mês é inferida do export do Theme
-  Studio (domingo = 1). Se o relógio mostrar deslocado, reordene os sprites.
+- **data**: a ordem dos índices segue o firmware — `1 = segunda … 7 = domingo`
+  e `1 = janeiro … 12 = dezembro` (confirmado no relógio: terça 17/11/2026
+  mostrou `TER` e novembro mostrou `NOV`). Se um dia aparecer deslocado,
+  reordene os sprites.
 - **temperatura** vem do clima sincronizado pelo celular; sem sync, `--`.
 - A arte 1536×2752 é esticada ~9% no eixo vertical para 280×456; o frame é
   desenhado em 9:16 e o relógio é 0,614.

@@ -137,17 +137,17 @@ temperatura), 22 altitude **[verificado em face real]**.
 | peça | draw_type | mensagem | campo do valor | refs |
 |---|---|---|---|---|
 | dia do mês | 3 | `Combined` | 5 = 17 | 10 dígitos, `align` 0 |
-| dia da semana | 2 | `Selected` | 3 = 52 | 8, índices 0..7 |
-| mês | 2 | `Selected` | 3 = 51 | 13, índices 0..12 **[inferido]** |
+| dia da semana | 2 | `Selected` | 3 = 52 | 8 (0 = fallback, 1 = segunda … 7 = domingo) |
+| mês | 2 | `Selected` | 3 = 51 | 13 (0 = fallback, 1 = janeiro … 12 = dezembro) |
 
 Cada peça aparece duas vezes: `ambient_mode` 0 (normal) e 1 (AOD). O
 `Selected` não tem `res_align`; a posição é o canto superior esquerdo da imagem.
 
-Ordem das refs do `Selected` **[inferido]**: o export do Theme Studio repete a
-primeira imagem no índice 0 e 1 (fallback + primeiro valor), como nas duas faces
-de referência. Seguimos `1 = domingo … 7 = sábado` e `1 = janeiro … 12 = dezembro`.
-Se o relógio mostrar o dia/mês deslocado, reordene a lista de sprites — a
-estrutura não muda.
+Ordem das refs do `Selected` **[verificado no relógio]**: o export do Theme
+Studio repete a primeira imagem no índice 0 e 1 (fallback + primeiro valor),
+como nas duas faces de referência. O firmware usa `1 = segunda … 7 = domingo`
+(em 17/11/2026, uma terça, apareceu `TER`) e `1 = janeiro … 12 = dezembro`
+(em novembro apareceu `NOV`). O índice 0 é o fallback.
 
 ## Limites
 

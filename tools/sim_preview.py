@@ -35,7 +35,7 @@ STEPS_Y = 250
 def draw_date(canvas: Image.Image, imgs: dict, root: list, iso: str) -> bool:
     """Desenha o elemento DATE do layout para a data pedida (só camadas normais)."""
     date = dt.date.fromisoformat(iso)
-    weekday = date.isoweekday() % 7 + 1      # domingo=1 ... sabado=7
+    weekday = date.isoweekday()              # segunda=1 ... domingo=7
     month = date.month
     elem = next((L.read(f[2]) for f in root
                  if f[0] == 1 and L.get_int(L.read(f[2]), 1) == 2), None)
@@ -72,6 +72,91 @@ def draw_date(canvas: Image.Image, imgs: dict, root: list, iso: str) -> bool:
     return True
 
 
+def render(info: dict, *, time: str = "10:08", values: dict | None = None,
+           v9: bool = False, split_hour: bool = False, split_minute: bool = False,
+           date: str | None = None, build: Path | None = None) -> Image.Image:
+    """Monta a face 280x456 a partir dos slots do bin, sem passar pelo .hwt."""
+    build = build or Path(__file__).resolve().parent.parent / "build"
+    imgs = {s["index"]: image_to_pil(s["blob"]) for s in info["images"] if s["size"]}
+    canvas = imgs[1].copy()
+    tile_w = imgs[3].width
+
+    top_y = 64 if v9 else TOP
+    hh, mm = time.split(":")
+
+    def digits(text: str, x: int, y: int, tiles: dict[str, Image.Image]) -> int:
+        for ch in text:
+            canvas.alpha_composite(tiles[ch], (x, y))
+            x += tiles[ch].width
+        return x
+
+    hour_tiles = {str(i): imgs[3 + i] for i in range(10)}
+    if split_hour:
+        hh = hh.zfill(2)
+        digits(hh[:1], 37, top_y, hour_tiles)
+        digits(hh[1:], 84, top_y, hour_tiles)
+    else:
+        digits(hh, HOUR_END - tile_w * len(hh), top_y, hour_tiles)
+    canvas.alpha_composite(imgs[13], (COLON_X, top_y))
+    if split_minute:
+        mm = mm.zfill(2)
+        digits(mm[:1], 149, top_y, hour_tiles)
+        digits(mm[1:], 196, top_y, hour_tiles)
+    else:
+        digits(mm, MIN_X, top_y, hour_tiles)
+
+    if values:
+        vdir = build / "value"
+        vt = {str(i): Image.open(vdir / f"{i}.png").convert("RGBA") for i in range(10)}
+
+        def center(text: str, cx: int, y: int, tiles=None) -> None:
+            tiles = tiles or vt
+            h = tiles["0"].height
+            w = sum(tiles[c].width for c in text)
+            digits(text, cx - w // 2, y - h // 2, tiles)
+
+        def right(text: str, x: int, y: int) -> None:
+            w = sum(vt[c].width for c in text)
+            digits(text, x - w, y, vt)
+
+        if v9:
+            if values.get("hr"):
+                digits(values["hr"], 60, 344, vt)
+            if values.get("cal"):
+                digits(values["cal"], 190, 344, vt)
+            if values.get("temp"):
+                digits(values["temp"], 60, 396, vt)
+            if values.get("bat"):
+                right(values["bat"], 228, 396)
+            if values.get("steps"):
+                bdir = build / "tiles_v9_banner"
+                if bdir.exists():
+                    bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA")
+                          for i in range(10)}
+                    digits(values["steps"], 118, 302, bt)
+        else:
+            if values.get("hr"):
+                center(values["hr"], 75, ROW1)
+            if values.get("cal"):
+                center(values["cal"], 205, ROW1)
+            if values.get("temp"):
+                center(values["temp"], 75, ROW2)
+            if values.get("bat"):
+                right(values["bat"], BAT_X, ROW2 - 20)
+            if values.get("steps"):
+                bdir = build / "tiles_v5_banner"
+                if bdir.exists():
+                    bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA")
+                          for i in range(10)}
+                    center(values["steps"], 140, STEPS_Y, bt)
+
+    if date:
+        root = L.read(info["layout"])
+        if not draw_date(canvas, imgs, root, date):
+            print("[sim] aviso: layout sem elemento DATE", file=sys.stderr)
+    return canvas
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("hwt")
@@ -90,92 +175,16 @@ def main() -> int:
     path = Path(args.hwt).expanduser()
     pkg = load_package(path)
     info = parse_bin(pkg["bin"])
-    imgs = {s["index"]: image_to_pil(s["blob"]) for s in info["images"] if s["size"]}
-    canvas = imgs[1].copy()
-    tile_w = imgs[3].width
-
-    top = 64 if args.v9 else TOP
-    hh, mm = args.time.split(":")
-
-    def digits(text: str, x: int, y: int, tiles: dict[str, Image.Image]) -> int:
-        for ch in text:
-            canvas.alpha_composite(tiles[ch], (x, y))
-            x += tiles[ch].width
-        return x
-
-    hour_tiles = {str(i): imgs[3 + i] for i in range(10)}
-    if args.split_hour:
-        hh = hh.zfill(2)
-        digits(hh[:1], 37, top, hour_tiles)
-        digits(hh[1:], 84, top, hour_tiles)
-    else:
-        digits(hh, HOUR_END - tile_w * len(hh), top, hour_tiles)
-    canvas.alpha_composite(imgs[13], (COLON_X, top))
-    if args.split_minute:
-        mm = mm.zfill(2)
-        digits(mm[:1], 149, top, hour_tiles)
-        digits(mm[1:], 196, top, hour_tiles)
-    else:
-        digits(mm, MIN_X, top, hour_tiles)
-
-    if args.values:
-        vals = dict(kv.split("=") for kv in args.values.split(","))
-        vdir = Path(__file__).resolve().parent.parent / "build" / "value"
-        vt = {str(i): Image.open(vdir / f"{i}.png").convert("RGBA") for i in range(10)}
-        th = vt["0"].height
-
-        def center(text: str, cx: int, y: int, tiles=None) -> None:
-            tiles = tiles or vt
-            h = tiles["0"].height
-            w = sum(tiles[c].width for c in text)
-            digits(text, cx - w // 2, y - h // 2, tiles)
-
-        def right(text: str, x: int, y: int) -> None:
-            w = sum(vt[c].width for c in text)
-            digits(text, x - w, y, vt)
-
-        if args.v9:
-            if vals.get("hr"):
-                digits(vals["hr"], 60, 344, vt)
-            if vals.get("cal"):
-                digits(vals["cal"], 190, 344, vt)
-            if vals.get("temp"):
-                digits(vals["temp"], 60, 396, vt)
-            if vals.get("bat"):
-                right(vals["bat"], 228, 396)
-            if vals.get("steps"):
-                bdir = Path(__file__).resolve().parent.parent / "build" / "tiles_v9_banner"
-                if bdir.exists():
-                    bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA")
-                          for i in range(10)}
-                    digits(vals["steps"], 118, 302, bt)
-        else:
-            if vals.get("hr"):
-                center(vals["hr"], 75, ROW1)
-            if vals.get("cal"):
-                center(vals["cal"], 205, ROW1)
-            if vals.get("temp"):
-                center(vals["temp"], 75, ROW2)
-            if vals.get("bat"):
-                right(vals["bat"], BAT_X, ROW2 - 20)
-            if vals.get("steps"):
-                bdir = Path(__file__).resolve().parent.parent / "build" / "tiles_v5_banner"
-                if bdir.exists():
-                    bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA")
-                          for i in range(10)}
-                    center(vals["steps"], 140, STEPS_Y, bt)
-
-    if args.date:
-        root = L.read(info["layout"])
-        if not draw_date(canvas, imgs, root, args.date):
-            print("[sim] aviso: layout sem elemento DATE", file=sys.stderr)
-
+    values = dict(kv.split("=") for kv in args.values.split(",")) if args.values else None
+    canvas = render(info, time=args.time, values=values, v9=args.v9,
+                    split_hour=args.split_hour, split_minute=args.split_minute,
+                    date=args.date)
     out = Path(args.out) if args.out else path.with_name(path.stem + "_sim.png")
     canvas.save(out)
-    print(f"[sim] {out}  (tile {tile_w}px)")
+    tile = next(s for s in info["images"] if s["index"] == 3)
+    print(f"[sim] {out}  (tile {image_to_pil(tile['blob']).width}px)")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
