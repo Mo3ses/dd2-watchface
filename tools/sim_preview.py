@@ -5,6 +5,9 @@ sim_preview.py — simula o que o relógio desenha, usando os slots do .hwt
     python tools/sim_preview.py out/ARISEN_HUD_v5.hwt --time 9:11 \
         --values "hr=62,cal=412,temp=24,bat=87,steps=8420"
 
+    python tools/sim_preview.py out/ARISEN_HUD_v13.hwt --v9 \
+        --split-hour --split-minute --date 2026-11-17
+
 Coordenadas do layout final (v5):
 hora termina em 131, dois-pontos em 131, minuto começa em 149, topo y=68.
 Valores: BPM/CAL em y=310 (centros 75/205), TEMP/BAT em y=382 (75/214),
@@ -13,18 +16,60 @@ passos centrados em 140, y=250.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import sys
 from pathlib import Path
 
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import layout as L  # noqa: E402
 from hwformat import image_to_pil, load_package, parse_bin  # noqa: E402
 
 HOUR_END, COLON_X, MIN_X, top = 131, 131, 149, 68
 ROW1, ROW2 = 334, 406
 BAT_X, STEPS_Y = 222, 266
 STEPS_Y = 250
+
+
+def draw_date(canvas: Image.Image, imgs: dict, root: list, iso: str) -> bool:
+    """Desenha o elemento DATE do layout para a data pedida (só camadas normais)."""
+    date = dt.date.fromisoformat(iso)
+    weekday = date.isoweekday() % 7 + 1      # domingo=1 ... sabado=7
+    month = date.month
+    elem = next((L.read(f[2]) for f in root
+                 if f[0] == 1 and L.get_int(L.read(f[2]), 1) == 2), None)
+    if elem is None:
+        return False
+    for lf in (L.read(f[2]) for f in elem if f[0] == 5):
+        draw = L.get_int(lf, 2)
+        if draw == 2:
+            body = L.read(L.get(lf, 5)[2])
+            vt = L.get_int(body, 3)
+            if L.get_int(body, 6) != 0:
+                continue
+            refs = [f[2].decode() for f in body if f[0] == 1]
+            value = {52: weekday, 51: month}.get(vt)
+            if value is None or value >= len(refs):
+                continue
+            pos = L.read(L.get(body, 2)[2])
+            tile = imgs.get(int(refs[value]) - 1)
+            if tile:
+                canvas.alpha_composite(tile, (L.get_int(pos, 1), L.get_int(pos, 2)))
+        elif draw == 3:
+            body = L.read(L.get(lf, 6)[2])
+            if L.get_int(body, 5) != 17 or L.get_int(body, 13) != 0:
+                continue
+            refs = [f[2].decode() for f in body if f[0] == 1]
+            pos = L.read(L.get(body, 3)[2])
+            x, y = L.get_int(pos, 1), L.get_int(pos, 2)
+            for ch in str(date.day):
+                tile = imgs.get(int(refs[int(ch)]) - 1)
+                if not tile:
+                    break
+                canvas.alpha_composite(tile, (x, y))
+                x += tile.width
+    return True
 
 
 def main() -> int:
@@ -37,6 +82,8 @@ def main() -> int:
                     help="minuto em dois controles (dezena 61 + unidade 62), sempre 01")
     ap.add_argument("--values", default=None)
     ap.add_argument("--v9", action="store_true", help="posicoes do Relic HUD")
+    ap.add_argument("--date", default=None,
+                    help="AAAA-MM-DD: desenha o elemento DATE do layout")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -117,6 +164,11 @@ def main() -> int:
                     bt = {str(i): Image.open(bdir / f"{i}.png").convert("RGBA")
                           for i in range(10)}
                     center(vals["steps"], 140, STEPS_Y, bt)
+
+    if args.date:
+        root = L.read(info["layout"])
+        if not draw_date(canvas, imgs, root, args.date):
+            print("[sim] aviso: layout sem elemento DATE", file=sys.stderr)
 
     out = Path(args.out) if args.out else path.with_name(path.stem + "_sim.png")
     canvas.save(out)
