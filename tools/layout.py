@@ -5,9 +5,10 @@ layout.py — edita o layout protobuf do watchface.bin (schema v2)
 Campos usados (schema do Theme Studio v11, recuperado do codec @joyofit/hwt):
 
     Element    1 label 2 is_support_option 4 res_preview 5 layer* 8 container*
-    Layer      1 index 2 draw_type 4 single_res 6 combined_res
+    Layer      1 index 2 draw_type 4 single_res 5 selected_res 6 combined_res
     Container  1 index 5 rect 6 layer* 8 data_type
     Combined   1 res_name* 3 res_position 4 res_align 5 value_type 13 ambient
+    Selected   1 res_name* 2 res_position 3 value_type 6 ambient
     Single     1 res_name 2 res_position 5 ambient
     Point      1 x 2 y      Rect 1 x 2 y 3 w 4 h
 
@@ -189,6 +190,68 @@ def add_metric(layout: bytes, refs: list[str], x: int, y: int,
 def add_combined_widget(layout: bytes, refs: list[str], x: int, y: int,
                         value_type: int, data_type: int, **kwargs) -> bytes:
     return add_metric(layout, refs, x, y, value_type, data_type, **kwargs)
+
+
+def _refs(payload: list[str]) -> bytearray:
+    out = bytearray()
+    for ref in payload:
+        out += write([[1, 2, ref.encode()]])
+    return out
+
+
+def _combined_date(refs: list[str], x: int, y: int, value_type: int,
+                   ambient: int) -> bytes:
+    body = _refs(refs)
+    body += write([[2, 2, b""], [3, 2, point(x, y)], [4, 0, 0],
+                   [5, 0, value_type], [6, 2, b""], [7, 0, 0],
+                   [8, 0, 0], [13, 0, ambient]])
+    return bytes(body)
+
+
+def _selected_date(refs: list[str], x: int, y: int, value_type: int,
+                   ambient: int) -> bytes:
+    body = _refs(refs)
+    body += write([[2, 2, point(x, y)], [3, 0, value_type], [6, 0, ambient]])
+    return bytes(body)
+
+
+def add_date(layout: bytes, *, weekday: list[str], day: list[str], month: list[str],
+             x_weekday: int, x_day: int, x_month: int, y: int,
+             weekday_aod: list[str] | None = None,
+             day_aod: list[str] | None = None,
+             month_aod: list[str] | None = None) -> bytes:
+    """Acrescenta o elemento DATE: dia (combined vt 17), semana (selected vt 52)
+    e mes (selected vt 51), com copia para o AOD.
+
+    Molde verificado em base/ref/SpaceRed.hwt. As listas de palavras seguem o
+    export do Theme Studio: indice 0 = fallback, 1..7 domingo..sabado,
+    1..12 janeiro..dezembro.
+    """
+    weekday_aod = weekday_aod if weekday_aod is not None else weekday
+    day_aod = day_aod if day_aod is not None else day
+    month_aod = month_aod if month_aod is not None else month
+
+    layers: list[bytes] = []
+    index = 0
+    for ambient, wd, dd, mo in ((0, weekday, day, month),
+                                (1, weekday_aod, day_aod, month_aod)):
+        for draw_type, refs, x, vt in ((2, wd, x_weekday, 52),
+                                       (3, dd, x_day, 17),
+                                       (2, mo, x_month, 51)):
+            if draw_type == 2:
+                body = _selected_date(refs, x, y, vt, ambient)
+                layer = write([[1, 0, index], [2, 0, 2], [5, 2, body]])
+            else:
+                body = _combined_date(refs, x, y, vt, ambient)
+                layer = write([[1, 0, index], [2, 0, 3], [6, 2, body]])
+            layers.append(layer)
+            index += 1
+
+    element = write([[1, 0, 2], [2, 0, 0], [4, 2, b""]]
+                   + [[5, 2, layer] for layer in layers])
+    root = read(layout)
+    root.append([1, 2, element])
+    return write(root)
 
 
 def split_pair(layout: bytes, *, in_vt: int, tens_vt: int, units_vt: int,

@@ -21,22 +21,24 @@ def layer_info(lf: list) -> str:
     bits = [f"idx={L.get_int(lf, 1)}", DRAW.get(draw, str(draw))]
     if body:
         bf = L.read(body[2])
-        vt = L.get(bf, 5)
-        if vt is None:
-            vt = L.get(bf, 6)
-        if vt is None:
+        if draw == 2:                    # SELECTED: vt em 3, ambient em 6
             vt = L.get(bf, 3)
+            pos = L.get(bf, 2)
+        elif draw == 3:                  # COMBINED: vt em 5, ambient em 13
+            vt = L.get(bf, 5)
+            pos = L.get(bf, 3)
+        else:
+            vt = L.get(bf, 5) or L.get(bf, 6) or L.get(bf, 3)
+            pos = L.get(bf, 3) or L.get(bf, 2)
         if vt is not None and isinstance(vt[2], int):
             bits.append(f"vt={vt[2]}")
-        idx = L.get_int(lf, 1)
-        pos = L.get(bf, 3) or L.get(bf, 2)
         if pos and pos[1] == 2:
             p = L.read(pos[2])
             bits.append(f"pos=({L.get_int(p,1)},{L.get_int(p,2)})")
         al = L.get(bf, 4)
         if al:
             bits.append(f"align={al[2]}")
-        amb = L.get(bf, 13) or L.get(bf, 5)
+        amb = L.get(bf, 13) or L.get(bf, 6) or L.get(bf, 5)
         if amb:
             bits.append(f"amb={amb[2]}")
         n = len([f for f in bf if f[0] == 1])

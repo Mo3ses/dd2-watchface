@@ -326,6 +326,18 @@ def word_set(font_path: Path, size: int, color, words: list[str], prefix: str, o
     return {"size": size, "height": int(round(th / SS)), "widths": widths}
 
 
+def date_set(font_path: Path, out_dir: Path, color) -> dict:
+    """Digitos 15px sem padding + palavras de semana/mes para o controle DATE.
+
+    O firmware suprime o zero a esquerda no dia; a tile sem padding deixa o par
+    de digitos com o mesmo avanco do texto que era assado no fundo.
+    """
+    digits = digit_atlas(font_path, 15, color, "0123456789", out_dir, pad=0)
+    weekdays = word_set(font_path, 15, color, WEEKDAYS, "wd", out_dir)
+    months = word_set(font_path, 15, color, MONTHS, "mo", out_dir)
+    return {"digits": digits, "weekdays": weekdays, "months": months}
+
+
 def fit_time_size(font_path: Path, text: str, max_w: int, hi: int = 108, lo: int = 48) -> int:
     s = hi
     while s > lo:
@@ -454,6 +466,10 @@ def main() -> int:
     wd_meta = word_set(font_path, 15, PARCHMENT, WEEKDAYS, "wd", out / "words")
     mo_meta = word_set(font_path, 15, PARCHMENT, MONTHS, "mo", out / "words")
 
+    # controles dinamicos de data: mesma metrica do texto assado no topo
+    date_norm = date_set(font_path, out / "date_normal", PARCHMENT)
+    date_aod = date_set(font_path, out / "date_aod", AOD_GOLD)
+
     # icones avulsos
     ico = Image.new("RGBA", (S(22), S(22)), rgba(BLACK, 0))
     heart(ImageDraw.Draw(ico), S(11), S(10), S(16), rgba(EMBER, 255))
@@ -478,6 +494,13 @@ def main() -> int:
         "date": {"size": 15, "baseline_y": HEADER_BASE, "right_x": W - 24,
                  "digits": date_meta, "weekdays": wd_meta, "months": mo_meta,
                  "weekday_order": WEEKDAYS, "month_order": MONTHS},
+        "date_controls": {
+            "baseline_y": 42,
+            "normal": {"dir": "date_normal", **date_norm},
+            "aod": {"dir": "date_aod", **date_aod},
+            "weekday_values": ["fallback"] + WEEKDAYS,
+            "month_values": ["fallback"] + MONTHS,
+        },
         "cells": {
             "heart":  {"icon": "icon_heart.png", "label": None, "column": 0, "row": 0,
                        "value_baseline_y": VALUE_BASE[0], "x": COL_L, "value_type": "heart_rate"},
