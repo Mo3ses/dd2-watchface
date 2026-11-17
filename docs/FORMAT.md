@@ -86,6 +86,7 @@ Layer     1 index, 2 draw_type, 4 single_res, 5 selected_res, 6 combined_res
 Container 1 index, 2 is_support_option, 5 rect, 6 layer*, 8 data_type
 Combined  1 res_name*, 2 res_default, 3 res_position(Point), 4 res_align,
           5 value_type, 6 res_sign, 7 x_offset, 8 y_offset, 13 ambient_mode
+Selected  1 res_name*, 2 res_position(Point), 3 value_type, 6 ambient_mode
 Single    1 res_name, 2 res_position, 5 ambient_mode
 Rect      1 x, 2 y, 3 width, 4 height      Point 1 x, 2 y
 ```
@@ -127,6 +128,26 @@ Regras de campo **[verificado]**:
 
 Container `data_type`: 10 passos, 11 batimento, 17 bateria, 21 clima (hospeda
 temperatura), 22 altitude **[verificado em face real]**.
+
+## Elemento DATE
+
+**[verificado]** contra `base/ref/SpaceRed.hwt` (label 2, `is_support_option`
+0, `res_preview` vazio):
+
+| peça | draw_type | mensagem | campo do valor | refs |
+|---|---|---|---|---|
+| dia do mês | 3 | `Combined` | 5 = 17 | 10 dígitos, `align` 0 |
+| dia da semana | 2 | `Selected` | 3 = 52 | 8, índices 0..7 |
+| mês | 2 | `Selected` | 3 = 51 | 13, índices 0..12 **[inferido]** |
+
+Cada peça aparece duas vezes: `ambient_mode` 0 (normal) e 1 (AOD). O
+`Selected` não tem `res_align`; a posição é o canto superior esquerdo da imagem.
+
+Ordem das refs do `Selected` **[inferido]**: o export do Theme Studio repete a
+primeira imagem no índice 0 e 1 (fallback + primeiro valor), como nas duas faces
+de referência. Seguimos `1 = domingo … 7 = sábado` e `1 = janeiro … 12 = dezembro`.
+Se o relógio mostrar o dia/mês deslocado, reordene a lista de sprites — a
+estrutura não muda.
 
 ## Limites
 

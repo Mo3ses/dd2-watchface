@@ -10,13 +10,14 @@ O projeto tem três camadas independentes:
 1. **Arte** (`gen_assets.py`): fundo HUD, brasa, rótulos, atlas de dígitos, AOD,
    thumbnail. Tudo desenhado em Pillow com a fonte local.
 2. **Layout** (`tools/layout.py`): edita o protobuf do `watchface.bin` — posição
-   e alinhamento da hora, e containers de widget (batimento, bateria, clima).
+   e alinhamento da hora, containers de widget (batimento, bateria, clima) e o
+   elemento `DATE` (semana, dia e mês) com cópia para o AOD.
 3. **Empacotamento** (`tools/hwformat.py`): escreve header, tabela e blobs de
    imagem no formato do firmware, com verificação antes de salvar.
 
-Estado atual: **face instalada no relógio**, hora viva, fundo com a arte do
-coração de brasa. Batimento e bateria estão no layout (v4) aguardando teste no
-pulso. Temperatura e caloria são o próximo corte.
+Estado atual: **face instalada no relógio**, hora viva e **data dinâmica** no
+topo (semana, dia e mês, normal e AOD). A v13 substitui a v9, que levava a data
+assada no fundo. Batimento, passos, temperatura e bateria vêm dos widgets.
 
 ## estrutura
 
@@ -25,8 +26,9 @@ gen_assets.py             gerador de sprites (Pillow)
 tools/hwformat.py         leitor/escritor do watchface.bin
 tools/layout.py           editor do layout protobuf (schema v2)
 tools/layout_info.py      resumo legível de elementos/layers/containers
-tools/build_face.py       monta as variantes v0..v4 sobre o seed
-tools/artbg.py            fundo a partir de fundo.jpg + rótulos
+tools/build_face.py       monta as variantes v0..v13 sobre o seed
+tools/artbg.py            fundo a partir de fundo.jpg + rótulos (v4..v8)
+tools/artbg_relic.py      fundo estático do Relic HUD, sem hora nem data (v9+)
 tools/inspect_hwt.py      inventário de slots de um .hwt
 tools/pack_hwt.py         troca sprites por slotmap
 tools/sim_preview.py      simula o render do relógio
@@ -64,11 +66,17 @@ o `description.xml`, e o builder troca pele e geometria.
 
 ```powershell
 python gen_assets.py --strict     # sprites + preview
-python tools/artbg.py             # fundo a partir da arte + rótulos
-python tools/build_face.py        # out/ARISEN_HUD_v0..v4.hwt
-python tools/sim_preview.py out\ARISEN_HUD_v4.hwt --time 9:11 --values "hr=62,cal=412,temp=24,bat=87"
-python tools/mockup.py out\ARISEN_HUD_v4_sim.png out\preview_v4.png
+python tools/artbg.py             # fundo a partir da arte + rótulos (v4..v8)
+python tools/artbg_relic.py       # fundo estático do Relic HUD (v9+)
+python tools/build_face.py        # out/ARISEN_HUD_v0..v13.hwt
+python tools/sim_preview.py out\ARISEN_HUD_v13.hwt --v9 --split-hour --split-minute `
+    --time 14:23 --date 2026-11-17 --values "hr=62,cal=412,temp=24,bat=87,steps=3676"
+python tools/mockup.py out\ARISEN_HUD_v13_sim.png out\preview_v13.png
 ```
+
+A face para instalar é `out/ARISEN_HUD_v13.hwt`. O `--date` da simulação lê o
+elemento `DATE` do próprio layout (refs e posições), então ele também serve de
+teste do pacote.
 
 Variantes:
 
@@ -79,6 +87,9 @@ Variantes:
 | v2 | v1 + hora/minuto ancorados à direita (`9` e `09` no mesmo pixel) |
 | v3 | v2 + containers de batimento e bateria |
 | v4 | v3 + arte do `fundo.jpg` como fundo e rótulos assentes nela |
+| v5..v8 | banner de passos, grade 2×2 e hora em quatro controles |
+| v9 | Relic HUD instalado; data assada no fundo (histórico, rebuild sai sem data) |
+| v13 | v9 + elemento `DATE` dinâmico: semana, dia e mês, normal e AOD |
 
 ## instalar (iPhone → relógio)
 
@@ -95,6 +106,8 @@ RSA entrou no 6.0.0.328+.
 ## limites conhecidos
 
 - **caloria**: o id não está resolvido (1 ou 3, ambos ambíguos na documentação).
+- **data**: a ordem dos índices de semana/mês é inferida do export do Theme
+  Studio (domingo = 1). Se o relógio mostrar deslocado, reordene os sprites.
 - **temperatura** vem do clima sincronizado pelo celular; sem sync, `--`.
 - A arte 1536×2752 é esticada ~9% no eixo vertical para 280×456; o frame é
   desenhado em 9:16 e o relógio é 0,614.
