@@ -22,10 +22,14 @@ Variantes:
     v4  v3 + arte do fundo.jpg como plano de fundo
     v5  layout final: hora alta, banner de passos, grid 2x2, 5 metricas
 
+    v9  layout final: HUD relic, hora em 4 controles, sem rotulos
+    v13 v9 + data dinamica no topo (semana/dia/mes, normal e AOD)
+
     python tools/build_face.py
 """
 from __future__ import annotations
 
+import datetime as dt
 import sys
 from pathlib import Path
 
@@ -39,6 +43,7 @@ sys.path.insert(0, str(PROJECT))
 sys.path.insert(0, str(TOOLS))
 import gen_assets as ga  # noqa: E402
 import layout as L  # noqa: E402
+import sim_preview  # noqa: E402
 from hwformat import build_bin, load_package, parse_bin, pil_to_blob, save_package  # noqa: E402
 
 SLOTS = {
@@ -145,6 +150,13 @@ VARIANTS = {
            ]},
 }
 
+# v13 = v9 + data dinamica. A v9 fica como historico: o fundo relic nao assa
+# mais a data, entao um rebuild da v9 sai sem data nenhuma.
+VARIANTS["v13"] = {
+    **VARIANTS["v9"],
+    "date": {"weekday_x": 180, "day_x": 211, "month_x": 232, "y": 29},
+}
+
 
 def render(ch: str, w: int, h: int, size: int, color, colon: bool = False,
            baseline: float = 0.78, gradient=None, stroke=None) -> Image.Image:
@@ -207,6 +219,32 @@ def build_banner(name: str, cfg: dict, build: Path) -> list[Path]:
     return digits
 
 
+def build_date_assets(blobs: list[bytes], build: Path) -> dict[str, dict[str, list[str]]]:
+    """Anexa sprites de data (normal e AOD) e devolve refs por modo/peca.
+
+    Listas de palavras seguem o export do Theme Studio: indice 0 e fallback e
+    repete a ref do indice 1, como em base/ref/SpaceRed.hwt.
+    """
+    refs: dict[str, dict[str, list[str]]] = {}
+    for mode in ("normal", "aod"):
+        folder = build / f"date_{mode}"
+        pieces = {
+            "weekday": [folder / f"wd_{i:02d}.png" for i in range(1, 8)],
+            "day": [folder / f"{i}.png" for i in range(10)],
+            "month": [folder / f"mo_{i:02d}.png" for i in range(1, 13)],
+        }
+        group: dict[str, list[str]] = {}
+        for kind, files in pieces.items():
+            start = len(blobs)
+            for path in files:
+                with Image.open(path) as im:
+                    blobs.append(pil_to_blob(im.convert("RGBA")))
+            names = [f"{start + i + 1:03d}" for i in range(len(files))]
+            group[kind] = [names[0]] + names if kind != "day" else names
+        refs[mode] = group
+    return refs
+
+
 def rename_description(desc: bytes) -> bytes:
     import re
     replacements = [
@@ -220,12 +258,12 @@ def rename_description(desc: bytes) -> bytes:
     return desc
 
 
-def bump_description(desc: bytes, index: int) -> bytes:
+def bump_description(desc: bytes, offset: int) -> bytes:
     import re
     hit = re.search(rb"<version>(\d+)\.(\d+)\.(\d+)</version>", desc)
     if not hit:
         return desc
-    z = int(hit.group(3)) + index
+    z = int(hit.group(3)) + offset
     return desc.replace(hit.group(0),
                         f"<version>{hit.group(1).decode()}."
                         f"{hit.group(2).decode()}.{z}</version>".encode())
@@ -250,7 +288,7 @@ def main() -> int:
     info = parse_bin(pkg["bin"])
     print(f"[seed] {len(info['images'])} slots, layout {len(info['layout'])} B")
 
-    for index, (name, cfg) in enumerate(VARIANTS.items()):
+    for name, cfg in VARIANTS.items():
         tiles = build_tiles(name, cfg, build)
         art = cfg.get("art")
         if art == "relic":
@@ -323,13 +361,41 @@ def main() -> int:
                     m["x"], m["y"], m["vt"], m["dt"],
                     index=i, align=m.get("align", 0), box=m.get("box"))
 
+        if cfg.get("date"):
+            drefs = build_date_assets(blobs, build)
+            dcfg = cfg["date"]
+            layout_bytes = L.add_date(
+                layout_bytes,
+                weekday=drefs["normal"]["weekday"],
+                day=drefs["normal"]["day"],
+                month=drefs["normal"]["month"],
+                weekday_aod=drefs["aod"]["weekday"],
+                day_aod=drefs["aod"]["day"],
+                month_aod=drefs["aod"]["month"],
+                x_weekday=dcfg["weekday_x"], x_day=dcfg["day_x"],
+                x_month=dcfg["month_x"], y=dcfg["y"])
+
         override = {}
         if pkg["description"]:
             desc = rename_description(pkg["description"])
-            override["description.xml"] = bump_description(desc, index)
+            override["description.xml"] = bump_description(desc, int(name[1:]))
 
         new_bin = build_bin(info["version"], layout_bytes, blobs,
                             signature=info["signature"], reserved=info["reserved"])
+
+        if cfg.get("date"):
+            # thumbnail do seletor: renderiza a propria face (data de hoje)
+            thumb = sim_preview.render(
+                parse_bin(new_bin), time="10:08",
+                values={"hr": "62", "cal": "412", "temp": "24",
+                        "bat": "87", "steps": "3676"},
+                v9=True, split_hour=True, split_minute=True,
+                date=dt.date.today().isoformat(), build=build)
+            thumb = thumb.resize((156, 256), Image.Resampling.LANCZOS)
+            blobs[0] = pil_to_blob(thumb.convert("RGBA"))
+            new_bin = build_bin(info["version"], layout_bytes, blobs,
+                                signature=info["signature"], reserved=info["reserved"])
+
         dest = out / f"ARISEN_HUD_{name}.hwt"
         save_package(pkg, new_bin, dest, overrides=override)
         print(f"[{name}] {dest}  ({len(new_bin)} B de binario)")

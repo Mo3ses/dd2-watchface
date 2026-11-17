@@ -4,9 +4,10 @@ artbg_relic.py — fundo estatico do Arisen Relic HUD (v9)
 
     python tools/artbg_relic.py
 
-Assa no fundo tudo que nao muda: moldura, topo, linhas e losangos do banner,
-moldura da barra de stamina com preenchimento estatico, icones vetoriais do
-HUD, sufixos ° e % e o placeholder --.
+Assa no fundo tudo que nao muda: moldura, topo (I e losango), linhas e losangos
+do banner, moldura da barra de stamina com preenchimento estatico, icones
+vetoriais do HUD, sufixos ° e % e o placeholder --. Hora e data sao controles
+do layout, nao entram no PNG.
 Gera build/bg_relic.png e build/bg_relic_aod.png.
 """
 from __future__ import annotations
@@ -81,9 +82,8 @@ def main() -> int:
     canvas = Image.open(SRC).convert("RGBA").resize((s(W), s(H)), Image.Resampling.LANCZOS)
     d = ImageDraw.Draw(canvas)
 
-    # topo
+    # topo (a data e dinamica: vem dos controles DATE do layout)
     f_top = ImageFont.truetype(str(font_path), s(15))
-    d.text((s(256), s(42)), "QUA 11 NOV", font=f_top, fill=(*ga.PARCHMENT, 255), anchor="rs")
     ga.diamond(d, s(26), s(37), s(4.5), (*ga.GOLD, 255), width=s(1))
     ga.diamond(d, s(26), s(37), s(1.6), (*ga.GOLD, 255), width=0, fill=(*ga.GOLD, 255))
     d.text((s(38), s(42)), "I", font=f_top, fill=(*ga.GOLD, 255), anchor="ls")

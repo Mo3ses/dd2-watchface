@@ -3,7 +3,7 @@
 selftest_layout.py — prova as edições de layout sem relógio
 
 Monta um layout sintético (hora + dois-pontos + minuto), aplica
-fix_time_alignment e add_metric, e confere campo por campo.
+fix_time_alignment, add_metric e add_date, e confere campo por campo.
 
     python tools/selftest_layout.py
 """
@@ -96,6 +96,27 @@ def main() -> int:
     assert len([f for f in body if f[0] == 1]) == 10
     assert L.get(body, 2) is not None and L.get(body, 6) is not None
     print("[ok] add_metric: container com is_support_option, data_type e rect")
+
+    weekday = ["020", "020", "021", "022", "023", "024", "025", "026"]
+    month = ["030", "030"] + [f"{31 + i:03d}" for i in range(11)]
+    day = [f"{40 + i:03d}" for i in range(10)]
+    with_date = L.add_date(fixed, weekday=weekday, day=day, month=month,
+                           x_weekday=180, x_day=211, x_month=232, y=29)
+    elems = [L.read(f[2]) for f in L.read(with_date) if f[0] == 1]
+    assert len(elems) == 2, len(elems)
+    date = find(elems, 2)[0]
+    layers = [L.read(f[2]) for f in date if f[0] == 5]
+    assert len(layers) == 6, len(layers)
+    combined = [L.read(L.get(lf, 6)[2]) for lf in layers if L.get_int(lf, 2) == 3]
+    selected = [L.read(L.get(lf, 5)[2]) for lf in layers if L.get_int(lf, 2) == 2]
+    assert len(combined) == 2 and len(selected) == 4
+    assert all(L.get_int(b, 5) == 17 for b in combined)
+    assert sorted(L.get_int(s, 3) for s in selected) == [51, 51, 52, 52]
+    assert [L.read(L.get(b, 3)[2])[0][2] for b in combined] == [211, 211]
+    assert L.get_int(combined[0], 13) == 0 and L.get_int(combined[1], 13) == 1
+    assert len([f for f in selected[0] if f[0] == 1]) == 8      # semana + fallback
+    assert len([f for f in selected[1] if f[0] == 1]) == 13     # mes + fallback
+    print("[ok] add_date: 6 layers (semana/dia/mes, normal+AOD), vt 17/52/51")
 
     # o elemento de tempo original tem que sobreviver byte a byte
     before = [f for f in L.read(original) if f[0] == 1][0][2]
